@@ -57,7 +57,7 @@ void SetupExternalInterrupts(uint8_t _state) {
    // EICRA |= ( (1<<ISC11) | (0<<ISC10) );
     EICRA |= ( (1<<ISC01) | (0<<ISC00) );
     //  Enable/Disable interrupts request
-    EIMSK |= ( (_state<<INT0) /*| (_state<<INB) */);
+    EIMSK |= ( (_state<<INT0) | (_state<<INB) );
 }
 
 void SetupSpi (void){
@@ -73,3 +73,12 @@ void SetupSpi (void){
 
     return;
 }
+
+/*void SpiSend (uint8_t data) {
+    // load data into register
+    SPDR = data;
+
+    // Wait for transmission complete
+    while(!(SPSR & (1 << SPIF)));
+
+}*/
