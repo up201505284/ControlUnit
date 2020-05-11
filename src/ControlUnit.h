@@ -35,7 +35,7 @@
 //  ADC Channel
 #define ADC_CHANNEL 0b0000
 
-//  Reset counter of timer0
+//  Reset counter of timer
 #define PWM_10KHZ   0x063F
 #define PWM_20KHZ   0x031F
 #define PWM_105HZ   0x4A67
@@ -58,6 +58,7 @@
 #define BASIC_REFRACTED             0x04
 #define ADVANCED_EXTENDED           0x06
 #define ADVANCED_REFRACTED          0x07
+#define SETUP_COMMUNICATION         0x08
 
 //  States for initial setup mode
 #define IS_INIT                     0x00                                      
@@ -67,13 +68,12 @@
 #define IS_SEND_PULSE_RATE          0x04
 #define IS_FINISHED                 0x05
 
-#define SR_STOP                     0x00
 #define SR_EXTENDED                 0x00
-#define SR_REFRACTED                0x00
-#define SR_FINISHED                 0x00    
+#define SR_REFRACTED                0x01
+#define SR_FINISHED                 0x02
 
 
-//  SPI Commands      
+//  SPI Commands RX (from central init to control unit)    
 #define DISCONNECTED()              0x00 
 #define INITIALSETUP()              0x01 
 #define SAFERESET()                 0x02  
@@ -83,3 +83,15 @@
 #define ADVANCEDREFRACTED()         0x06  
 #define STOP()                      0x07
 #define SUCESS()                    0x08  
+#define SENDING_SHIFT()             0x09
+#define SETUPCOMMUNICATION()        0x10
+#define SENDINGSTROKELENGHT()       0x11
+#define SENDINGPULSERATE()          0x12
+#define SENDINGSOFTSTARTSTOP()      0x13
+#define SENDINGACCELRATIONRATE()    0x14
+#define SENDINGACCELRATIONTIME()    0x15
+
+
+
+//  SPI Commands TX
+#define SEND_SHIFT()                0x16

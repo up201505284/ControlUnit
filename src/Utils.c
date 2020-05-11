@@ -35,17 +35,17 @@ uint16_t ReadAdc(void){
 }
 
 void SetupPwm(uint8_t _dutyCycle){
-    uint16_t occr1 = (PWM_105HZ+1)/100*_dutyCycle-1;
+    uint16_t occr1 = (PWM_10KHZ+1)/100*_dutyCycle-1;
     //  Non-inverting mode
     TCCR1A  |= (1<<COM1A1) | (0<<COM1A0);
     //  Mode13: Fasr-PWM with TOP=ICR1 
     TCCR1A  |= (1<<WGM11) | (0<<WGM10);
     TCCR1B  |= (1<<WGM13) | (1<<WGM12);
     //  No prescaler
-    TCCR1B  |= (0<<CS12) | (1<<CS11) | (1<<CS10);
+    TCCR1B  |= (0<<CS12) | (0<<CS11) | (1<<CS10);
 
-    ICR1H   = 0xFF & (PWM_105HZ>>8);
-    ICR1L   = 0xFF & PWM_105HZ;
+    ICR1H   = 0xFF & (PWM_10KHZ>>8);
+    ICR1L   = 0xFF & PWM_10KHZ;
 
     OCR1AH  = 0xFF & (occr1>>8);
     OCR1AL  = 0xFF & occr1;
