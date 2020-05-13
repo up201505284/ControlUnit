@@ -1,5 +1,5 @@
 #ifndef	_PRINTF_TOOLS_H
-#define	_PRINTF_TOOLS_H	
+#define	_PRINTF_TOOLS_H	1
 
 #include <stdio.h>
 #include <avr/io.h>

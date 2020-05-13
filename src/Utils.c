@@ -3,6 +3,13 @@
 #include "ControlUnit.h"
 #include <avr/interrupt.h>
 
+void SetupExternalInterrupts(uint8_t _state) {
+    //  Falling edge of INT0/1 generates an interrupt
+   // EICRA |= ( (1<<ISC11) | (0<<ISC10) );
+    EICRA |= ( (1<<ISC01) | (0<<ISC00) );
+    //  Enable/Disable interrupts request
+    EIMSK |= ( (_state<<INT0) | (_state<<INB) );
+}
 
 
 void InitPorts(void){
@@ -13,9 +20,9 @@ void InitPorts(void){
     PORTB   &= ~(1<<PWM);
     
     //  Digital inputs
-   DDRD    &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Define direction
-   PORTD   |= ( (1<<HALL_S1) | (1<<HALL_S2) );  //  Enable pull-up
-
+    DDRD    &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Define direction
+    PORTD   |= ( (1<<HALL_S1) | (1<<HALL_S2) );   //  Enable pull-up
+    SetupExternalInterrupts(DISABLE);             //  Disable external interrupts
 }
 
 void InitAdc(void){
@@ -49,29 +56,39 @@ void SetupPwm(uint8_t _dutyCycle){
 
     OCR1AH  = 0xFF & (occr1>>8);
     OCR1AL  = 0xFF & occr1;
-
-}
-
-void SetupExternalInterrupts(uint8_t _state) {
-    //  Falling edge of INT0/1 generates an interrupt
-   // EICRA |= ( (1<<ISC11) | (0<<ISC10) );
-    EICRA |= ( (1<<ISC01) | (0<<ISC00) );
-    //  Enable/Disable interrupts request
-    EIMSK |= ( (_state<<INT0) | (_state<<INB) );
 }
 
 void SetupSpi (void){
     //  SPI Pins
         //  Set MISO output, all others input
     DDRB |= (1<<MISO);
-    //  Enable global interrupt
+    //  Disable global interrupt
     //  Clock Polarity Leading Edge-Rising, Trailing Edge-Falling
     //  Clock Phase Leading Edge-Sample, Trailing Edge-Setup
     //  Enabela SPI
-    SPCR |= (1<<SPE);
-    SPCR |= (1<<SPIE);
+    SPCR |= ( (1<<SPE) | (1<<SPIE) );
+}
 
-    return;
+/*uint8_t SpiRxTx(uint8_t data){
+    uint8_t receive;
+    //  Wait until transmission complete
+    while(!(SPSR & (1<<SPIF)));   
+    receive = SPDR;
+    //  Return received data
+    return receive;
+}*/
+
+void DisableSpiInterrupt(void){
+    SPCR &= ~(1<<SPIE);
+}
+
+void EnableSpiInterrutpt(void){
+    SPCR |= (1<<SPIE);    
+}
+
+
+void DisablePwm(void){
+    TCCR1B  |= (0<<CS12) | (0<<CS11) | (0<<CS10);    
 }
 
 /*void SpiSend (uint8_t data) {
