@@ -1,6 +1,7 @@
 #include "ControlUnit.h"
 #include "Utils.h"
 #include <avr/io.h>
+#include <util/delay.h>
 #include <avr/interrupt.h>
 #include "printf_tools.h"
 
@@ -20,11 +21,14 @@ uint8_t pulse_rate_s1     = 0x00;
 uint8_t pulse_rate_s2     = 0x00;
 
 //  Soft start and stop
-uint8_t soft_start_stop   = 0x00;
+uint8_t stroke_lenght     = 0x00;
+uint8_t pulse_rate        = 0x00;
 uint8_t accelaration_rate = 0x00;
 uint8_t accelaration_time = 0x00;
-uint8_t pulse_rate        = 0x00;
-uint8_t stroke_lenght     = 0x00;
+uint8_t soft_start_stop   = 0x00;
+uint8_t shiftRefracted    = 0x00;
+uint8_t shiftExtended     = 0x00;
+
 
 //  SPI buffers
 uint8_t spiCodeRx         = 0x00;
@@ -32,14 +36,14 @@ uint8_t spiBufferRx[256]  = {};
 uint8_t posSpiBufferRx    = 0x00;
 
 //  Functions for operating modes
-void    Sleep             (void);
-void    InitialSetup      (void);    
-void    SafeReset         (void); 
-void    Stopped           (void);
-void    BasicExtended     (void);
-void    BasicRefracted    (void);
-void    AdvancedExtended  (void);
-void    AdvancedRefracted (void);
+void    Sleep             (void         );
+void    InitialSetup      (void         );    
+void    SafeReset         (void         ); 
+void    Stopped           (void         );
+void    BasicExtended     (void         );
+void    BasicRefracted    (void         );
+void    AdvancedExtended  (uint8_t shift);
+void    AdvancedRefracted (uint8_t shift);
 
 //  Auxiliar functions
 uint8_t HallSensors       (void                         );
@@ -62,13 +66,16 @@ ISR(SPI_STC_vect) {
   }
   
   else if (spiCodeRx == SPICOMMANDFINISHED()) {
-    FLAG_BUFFER_SPI_COMPLETE = SET;
+    FLAG_BUFFER_SPI_COMPLETE = SET; 
     SPDR = SPIREADWITHSUCESS();
   }
 
   else if (spiCodeRx == DISABLESPI()) {
     SPDR = pulse_rate;
   }
+  else
+    SPDR = SPIREADWITHSUCESS();
+
 
   spiBufferRx[posSpiBufferRx] = spiCodeRx;
   posSpiBufferRx++;
@@ -100,6 +107,9 @@ int main () {
   accelaration_rate           = 0x00;
   accelaration_time           = 0x00;
   stroke_lenght               = 0x00;
+  shiftRefracted              = 0x00;
+  shiftExtended               = 0x00;
+  posSpiBufferRx              = 0x00;
   
   FLAG_BUFFER_SPI_COMPLETE    = CLEAR;
   FLAG_INITIAL_SETUP_FINISHED = CLEAR;
@@ -133,10 +143,10 @@ int main () {
         BasicRefracted();
         break;
       case ADVANCED_EXTENDED:
-        AdvancedExtended();
+        AdvancedExtended(shiftExtended);
         break;
       case ADVANCED_REFRACTED:
-        AdvancedRefracted();
+        AdvancedRefracted(shiftRefracted);
         break;    
       default:
         Sleep();
@@ -156,7 +166,6 @@ int main () {
           next_state = STOPPED;
         break;
       case STOPPED:
-        Stopped();
         if ( (spiBufferRx[MODE] == BASICEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
           FLAG_BUFFER_SPI_COMPLETE = CLEAR;
           next_state = BASIC_EXTENDED;
@@ -167,10 +176,12 @@ int main () {
         }
         else if ( (spiBufferRx[MODE] == ADVANCEDEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
           FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+          shiftExtended = spiBufferRx[SHIFT];
           next_state = ADVANCED_EXTENDED;
         }
         else if ( (spiBufferRx[MODE] == ADVANCEDREFRACTED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;         
+          FLAG_BUFFER_SPI_COMPLETE = CLEAR; 
+          shiftRefracted = spiBufferRx[SHIFT];        
           next_state = ADVANCED_REFRACTED;
         } 
         else if ( (spiBufferRx[MODE] == INITIALSETUP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
@@ -214,8 +225,9 @@ int main () {
         Sleep();
         break;
     }
-    if (next_state != current_state)
+    if (next_state != current_state) 
       printf("New State:%d; Previous State:%d\n", next_state, current_state);
+
     current_state = next_state;
   }
 }
@@ -234,32 +246,29 @@ void Sleep (void) {
   accelaration_time           = 0x00;
   stroke_lenght               = 0x00;
   
+  if ((FLAG_BUFFER_SPI_COMPLETE == 1) && (spiBufferRx[MODE] == ENABLESPI())) {
 
-  if (FLAG_BUFFER_SPI_COMPLETE == 1) {
-
+    FLAG_BUFFER_SPI_COMPLETE  = CLEAR;
     stroke_lenght             = spiBufferRx[STROKE_LENGHT]    ;
-    pulse_rate                = spiBufferRx[PULSE_RATE]       ;
+    pulse_rate                = spiBufferRx[PULSE_RATE_ENABLE];       
     accelaration_rate         = spiBufferRx[ACCELARATION_RATE];
     accelaration_time         = spiBufferRx[ACCELARATION_TIME];
     soft_start_stop           = spiBufferRx[SOFT_START_STOP]  ;    
     FLAG_RESET_COMMUNICATION  = SET ;
-  
-    printf("Stroke lenght: %d; Pulse rate: %d; Accelaration rate: %d; Accelaration Rate: %d; Soft start and stop: %d\n", stroke_lenght, pulse_rate, accelaration_rate, accelaration_time, soft_start_stop);
   }
 }
 
 void SafeReset (void) {
   Extend();
   while (HallSensors() == HIGH);
+  Stop();
+  _delay_ms(100);//////////// experimentar valores pode nao ser necesário
   Refract();
   while (HallSensors() == HIGH);
   Stop();
   FLAG_SAFE_RESET_FINISHED = SET;
 }
 
-void BasicExtended (void) {
-  Extend();
-}
 void  InitialSetup (void) {
   Extend();
   while (HallSensors() == HIGH);
@@ -268,6 +277,8 @@ void  InitialSetup (void) {
   count_pulse_s1 = 0;
   count_pulse_s2 = 0;
   SetupExternalInterrupts(ENABLE);
+
+  _delay_ms(100);//////////// experimentar valores pode nao ser necesáro
   
   Refract();
   while (HallSensors() == HIGH);
@@ -279,11 +290,49 @@ void  InitialSetup (void) {
   pulse_rate = (pulse_rate_s1 + pulse_rate_s2) / 2;
 
   FLAG_INITIAL_SETUP_FINISHED = SET;
+  //printf("%d, %d, %d\n", count_pulse_s1, count_pulse_s2, pulse_rate);
 
 }
 
 void BasicRefracted (void) {
   Refract();
+}
+
+void BasicExtended (void) {
+  Extend();
+}
+
+void AdvancedExtended (uint8_t shift) {
+  FLAG_MOTION_FINSISHED = CLEAR;
+  uint16_t maxPulses = shift*pulse_rate;
+  count_pulse_s1 = 0;
+  count_pulse_s2 = 0;
+  SetupExternalInterrupts(ENABLE);
+  
+  Extend();
+  
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (HallSensors() == HIGH));
+  
+  Stop();
+  
+  FLAG_MOTION_FINSISHED = SET;
+}
+
+void AdvancedRefracted (uint8_t shift) {
+  FLAG_MOTION_FINSISHED = CLEAR;
+  uint16_t  maxPulses = shift*pulse_rate;
+  count_pulse_s1 = 0;
+  count_pulse_s2 = 0;
+  
+  SetupExternalInterrupts(ENABLE);
+  
+  Refract();
+  
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (HallSensors() == HIGH));
+  
+  Stop();
+  
+  FLAG_MOTION_FINSISHED = SET;
 }
 
 void Stopped (void) {
@@ -298,6 +347,7 @@ void Stop  (void) {
   PORTD &= ~( 1 << INA  );
   PORTD &= ~( 1 << INB  );
   PORTD &= ~( 1 << SEL0 );
+  _delay_us(20);
   Pwm(soft_start_stop, LOW);
 }   
 
@@ -305,6 +355,7 @@ void Extend (void) {
   PORTD &= ~( 1 << INB  );
   PORTD |=  ( 1 << INA  );
   PORTD |=  ( 1 << SEL0 );
+  _delay_us(20);
   Pwm(soft_start_stop, HIGH);
 }
 
@@ -313,6 +364,7 @@ void Refract(void) {
   PORTD &= ~( 1 << SEL0 );
   PORTD |=  ( 1 << INB  );
   PORTB |=  ( 1 << PWM  );
+  _delay_us(20);
   Pwm(soft_start_stop, HIGH);
 }
 
@@ -334,12 +386,6 @@ void Pwm(uint8_t mode, uint8_t state) {
   }
 }
 
-void AdvancedExtended (void) {
-  return;
-}
-void AdvancedRefracted (void) {
-  return;
-}
 uint8_t HallSensors (void) {
   if ( ( ( PIND & (1<<HALL_S1) ) == LOW ) && ( ( ( PIND & (1<<HALL_S2) ) == LOW ) ) )
     return LOW;

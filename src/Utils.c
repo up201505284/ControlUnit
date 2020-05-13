@@ -1,6 +1,6 @@
+#include "ControlUnit.h"
 #include <avr/io.h>
 #include <util/twi.h>
-#include "ControlUnit.h"
 #include <avr/interrupt.h>
 
 void SetupExternalInterrupts(uint8_t _state) {
@@ -62,40 +62,14 @@ void SetupSpi (void){
     //  SPI Pins
         //  Set MISO output, all others input
     DDRB |= (1<<MISO);
-    //  Disable global interrupt
+    //  Enable global interrupt
     //  Clock Polarity Leading Edge-Rising, Trailing Edge-Falling
     //  Clock Phase Leading Edge-Sample, Trailing Edge-Setup
     //  Enabela SPI
     SPCR |= ( (1<<SPE) | (1<<SPIE) );
 }
 
-/*uint8_t SpiRxTx(uint8_t data){
-    uint8_t receive;
-    //  Wait until transmission complete
-    while(!(SPSR & (1<<SPIF)));   
-    receive = SPDR;
-    //  Return received data
-    return receive;
-}*/
-
-void DisableSpiInterrupt(void){
-    SPCR &= ~(1<<SPIE);
-}
-
-void EnableSpiInterrutpt(void){
-    SPCR |= (1<<SPIE);    
-}
-
 
 void DisablePwm(void){
     TCCR1B  |= (0<<CS12) | (0<<CS11) | (0<<CS10);    
 }
-
-/*void SpiSend (uint8_t data) {
-    // load data into register
-    SPDR = data;
-
-    // Wait for transmission complete
-    while(!(SPSR & (1 << SPIF)));
-
-}*/

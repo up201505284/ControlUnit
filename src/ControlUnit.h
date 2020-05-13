@@ -7,51 +7,57 @@
     //  INB    
     //  PWM      
     //  SEL0   
-#define INA         PD4                       
-#define INB         PD5
-#define PWM         PB1                
-#define SEL0        PD7                 
+#define INA                         PD4                       
+#define INB                         PD5
+#define PWM                         PB1                
+#define SEL0                        PD7                 
 
 //  Digital Inputs
     //  HALL_S1  
     //  HALL_S2   
-#define HALL_S1     PD2                 
-#define HALL_S2     PD3     
+#define HALL_S1                     PD2                 
+#define HALL_S2                     PD3     
 
 //  Analogue Inputs
     //  CS  
-#define CS          PC0
+#define CS                          PC0
 
 //  Spi Pins
-#define SCK         PB5
-#define MISO        PB4
-#define MOSI        PB3
-#define SS          PB2
+#define SCK                         PB5
+#define MISO                        PB4
+#define MOSI                        PB3
+#define SS                          PB2
 
 //  ADC Channel
-#define ADC_CHANNEL 0b0000
+#define ADC_CHANNEL                 0b0000
 
 //  Reset Value for Timer 1
-#define PWM_10KHZ   0x063F
+#define PWM_10KHZ                   0x063F
 
  //  Auxiliar Masks       
-#define ENABLE          1
-#define DISABLE         0
-#define HIGH            1
-#define LOW             0
-#define SET             1
-#define CLEAR           0
-#define SOFTSTARTSTOP   1
-#define DIGITAL         0
+#define ENABLE                      1
+#define DISABLE                     0
+#define HIGH                        1
+#define LOW                         0
+#define SET                         1
+#define CLEAR                       0
+#define SOFTSTARTSTOP               1
+#define DIGITAL                     0
 
 //  SPI Masks
-#define SHIFT               2
-#define MODE                1
-#define STROKE_LENGHT       2
-#define PULSE_RATE          3
-#define ACCELARATION_RATE   4
-#define ACCELARATION_TIME   5
-#define SOFT_START_STOP     6
+#define INIITIAL                    0
+#define MODE                        1
+#define SHIFT                       2
+#define PULSE_RATE_DISABLE          2
+#define STROKE_LENGHT               2
+#define PULSE_RATE_ENABLE           3
+#define ACCELARATION_RATE           4
+#define ACCELARATION_TIME           5
+#define SOFT_START_STOP             6
+#define SIZE_BUFFER_ENABLE_SPI      8
+#define SIZE_BUFFER_DISABLE_SPI     3
+#define SIZE_BUFFER_BASIC           3
+#define SIZE_BUFFER_ADVANCED        4
 
 
 //  Operating Modes 
