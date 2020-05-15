@@ -202,7 +202,7 @@ int main () {
           FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
           next_state = STOPPED;
         }
-        else if ( HallSensors() == LOW)
+        else if ( /*HallSensors() == LOW*/ ReadAdc() < 10)
           next_state = STOPPED;
         break;
       case BASIC_REFRACTED:
@@ -210,7 +210,7 @@ int main () {
           FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
           next_state = STOPPED;  
         }
-        else if ( HallSensors() == LOW)
+        else if ( /*HallSensors() == LOW*/ ReadAdc() < 10)
           next_state = STOPPED;        
         break;
       case ADVANCED_EXTENDED:
@@ -225,8 +225,9 @@ int main () {
         Sleep();
         break;
     }
-    if (next_state != current_state) 
-      printf("New State:%d; Previous State:%d\n", next_state, current_state);
+    if (next_state != current_state) {
+      printf("New State:%d; Previous State:%d; CS:%d\n", next_state, current_state, ReadAdc());
+    }
 
     current_state = next_state;
   }
@@ -260,18 +261,18 @@ void Sleep (void) {
 
 void SafeReset (void) {
   Extend();
-  while (HallSensors() == HIGH);
+  while (/*HallSensors() == HIGH)*/ReadAdc() > 10);
   Stop();
   _delay_ms(100);//////////// experimentar valores pode nao ser necesário
   Refract();
-  while (HallSensors() == HIGH);
+  while (/*HallSensors() == HIGH*/ReadAdc() > 10);
   Stop();
   FLAG_SAFE_RESET_FINISHED = SET;
 }
 
 void  InitialSetup (void) {
   Extend();
-  while (HallSensors() == HIGH);
+  while (/*HallSensors() == HIGH)*/ReadAdc() > 10);
   
   Stop();
   count_pulse_s1 = 0;
@@ -281,7 +282,7 @@ void  InitialSetup (void) {
   _delay_ms(100);//////////// experimentar valores pode nao ser necesáro
   
   Refract();
-  while (HallSensors() == HIGH);
+  while (/*HallSensors() == HIGH*/ ReadAdc() > 10);
   
   Stop();
   SetupExternalInterrupts(DISABLE);
@@ -311,7 +312,7 @@ void AdvancedExtended (uint8_t shift) {
   
   Extend();
   
-  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (HallSensors() == HIGH));
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && /*(HallSensors() == HIGH)*/(ReadAdc() > 10));
   
   Stop();
   
@@ -328,7 +329,7 @@ void AdvancedRefracted (uint8_t shift) {
   
   Refract();
   
-  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (HallSensors() == HIGH));
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && /*(HallSensors() == HIGH)*/(ReadAdc() > 10));
   
   Stop();
   
@@ -382,11 +383,15 @@ void Pwm(uint8_t mode, uint8_t state) {
       PORTB &= ~( 1 << PWM  ); 
     }
     else if (state == HIGH)
-      SetupPwm(50);
+      SetupPwm(70);
   }
+  else
+    PORTB &= ~( 1 << PWM  ); 
+ 
 }
 
 uint8_t HallSensors (void) {
+  _delay_us(300);
   if ( ( ( PIND & (1<<HALL_S1) ) == LOW ) && ( ( ( PIND & (1<<HALL_S2) ) == LOW ) ) )
     return LOW;
   else 

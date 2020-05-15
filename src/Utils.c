@@ -71,5 +71,6 @@ void SetupSpi (void){
 
 
 void DisablePwm(void){
-    TCCR1B  |= (0<<CS12) | (0<<CS11) | (0<<CS10);    
+    TCCR1A  &= ~( (1<<COM1A0) | (1<<COM1A1) );
+    TCCR1B  &= ~( (1<<CS12) | (1<<CS11) | (1<<CS10) );    
 }
