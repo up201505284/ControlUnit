@@ -30,9 +30,15 @@
 
 //  ADC Channel
 #define ADC_CHANNEL                 0b0000
+#define THRESHOLD_STOP              10
+#define THRESHOLD_START             10  
+#define THRESHOLD                   12
 
 //  Reset Value for Timer 1
 #define PWM_10KHZ                   0x063F
+
+//  Value for delay of 1ms
+#define OCR_1MS                     0xF9
 
  //  Auxiliar Masks       
 #define ENABLE                      1

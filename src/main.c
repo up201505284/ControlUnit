@@ -57,7 +57,9 @@ uint8_t current_state     = SLEEP;
 uint8_t next_state        = SLEEP;
 
 ISR(SPI_STC_vect) {
+
   spiCodeRx = SPDR;
+
   if (spiCodeRx == SPICOMMANDINITIAL()) {
     posSpiBufferRx = 0;
     FLAG_BUFFER_SPI_COMPLETE = CLEAR;
@@ -73,9 +75,9 @@ ISR(SPI_STC_vect) {
   else if (spiCodeRx == DISABLESPI()) {
     SPDR = pulse_rate;
   }
+
   else
     SPDR = SPIREADWITHSUCESS();
-
 
   spiBufferRx[posSpiBufferRx] = spiCodeRx;
   posSpiBufferRx++;
@@ -100,7 +102,6 @@ int main () {
   InitAdc();
   SetupSpi();
 
-  //EnableSpiInterrutpt();
 
   soft_start_stop             = 0x00;
   pulse_rate                  = 0x00;
@@ -110,127 +111,131 @@ int main () {
   shiftRefracted              = 0x00;
   shiftExtended               = 0x00;
   posSpiBufferRx              = 0x00;
-  
+
   FLAG_BUFFER_SPI_COMPLETE    = CLEAR;
   FLAG_INITIAL_SETUP_FINISHED = CLEAR;
   FLAG_SAFE_RESET_FINISHED    = CLEAR;
   FLAG_RESET_COMMUNICATION    = CLEAR;
   FLAG_MOTION_FINSISHED       = CLEAR;
-
+ 
   current_state               = SLEEP;
   next_state                  = SLEEP;
 
+
   sei();
+  
+  
+     while(1) {
 
- while(1) {
-    switch (current_state) {
-      case SLEEP:
-        Sleep();
-        break;
-      case INITIAL_SETUP:
-        InitialSetup();
-        break;
-      case SAFE_RESET:
-        SafeReset();
-        break;
-      case STOPPED:
-        Stopped();
-        break;
-      case BASIC_EXTENDED:
-        BasicExtended();
-        break;
-      case BASIC_REFRACTED:
-        BasicRefracted();
-        break;
-      case ADVANCED_EXTENDED:
-        AdvancedExtended(shiftExtended);
-        break;
-      case ADVANCED_REFRACTED:
-        AdvancedRefracted(shiftRefracted);
-        break;    
-      default:
-        Sleep();
-        break;
+     switch (current_state) {
+        case SLEEP:
+          Sleep();
+          break;
+        case INITIAL_SETUP:
+          InitialSetup();
+          break;
+        case SAFE_RESET:
+          SafeReset();
+          break;
+        case STOPPED:
+          Stopped();
+          break;
+        case BASIC_EXTENDED:
+          BasicExtended();
+          break;
+        case BASIC_REFRACTED:
+          BasicRefracted();
+          break;
+        case ADVANCED_EXTENDED:
+          AdvancedExtended(shiftExtended);
+          break;
+        case ADVANCED_REFRACTED:
+          AdvancedRefracted(shiftRefracted);
+          break;    
+        default:
+          Sleep();
+          break;
+      }
+      switch (current_state) {
+        case SLEEP:
+          if (FLAG_RESET_COMMUNICATION == HIGH)
+            next_state = STOPPED;
+        case INITIAL_SETUP:
+          if (FLAG_INITIAL_SETUP_FINISHED == HIGH)
+            next_state = STOPPED;
+          break;
+        case SAFE_RESET:
+          if (FLAG_SAFE_RESET_FINISHED == HIGH)
+            next_state = STOPPED;
+          break;
+        case STOPPED:
+          if ( (spiBufferRx[MODE] == BASICEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+            next_state = BASIC_EXTENDED;
+          }
+          else if ( (spiBufferRx[MODE] == BASICREFRACTED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;        
+            next_state = BASIC_REFRACTED;
+          }
+          else if ( (spiBufferRx[MODE] == ADVANCEDEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+            shiftExtended = spiBufferRx[SHIFT];
+            next_state = ADVANCED_EXTENDED;
+          }
+          else if ( (spiBufferRx[MODE] == ADVANCEDREFRACTED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR; 
+            shiftRefracted = spiBufferRx[SHIFT];        
+            next_state = ADVANCED_REFRACTED;
+          } 
+          else if ( (spiBufferRx[MODE] == INITIALSETUP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+            next_state = INITIAL_SETUP;
+          } 
+          else if ( (spiBufferRx[MODE] == SAFERESET()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+            next_state = SAFE_RESET;
+          }
+          else if ( (spiBufferRx[MODE] == DISABLESPI()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;
+            next_state = SLEEP;
+          }
+          break;
+        case BASIC_EXTENDED:
+          if ( (spiBufferRx[MODE] == STOP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
+            next_state = STOPPED;
+          }
+          else if (ReadAdc() < THRESHOLD*2 )
+            next_state = STOPPED;
+          break;
+        case BASIC_REFRACTED:
+          if ( (spiBufferRx[MODE] == STOP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
+            FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
+            next_state = STOPPED;  
+          }
+          else if ( ReadAdc() < THRESHOLD*2 )
+            next_state = STOPPED;        
+          break;
+        case ADVANCED_EXTENDED:
+          if (FLAG_MOTION_FINSISHED == HIGH)
+            next_state = STOPPED;
+          break;
+        case ADVANCED_REFRACTED:
+          if (FLAG_MOTION_FINSISHED == HIGH) 
+            next_state = STOPPED;     
+          break;    
+        default:
+          Sleep();
+          break;
+      }
+      if (next_state != current_state) {
+        printf("New State:%d; Previous State:%d; CS:%d\n", next_state, current_state, ReadAdc());
+          printf("S1:%d, S2:%d, pulse rate: %d\n", count_pulse_s1, count_pulse_s2, pulse_rate);
+
+      }
+      current_state = next_state;
     }
 
-    switch (current_state) {
-      case SLEEP:
-        if (FLAG_RESET_COMMUNICATION == HIGH)
-          next_state = STOPPED;
-      case INITIAL_SETUP:
-        if (FLAG_INITIAL_SETUP_FINISHED == HIGH)
-          next_state = STOPPED;
-        break;
-      case SAFE_RESET:
-        if (FLAG_SAFE_RESET_FINISHED == HIGH)
-          next_state = STOPPED;
-        break;
-      case STOPPED:
-        if ( (spiBufferRx[MODE] == BASICEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;
-          next_state = BASIC_EXTENDED;
-        }
-        else if ( (spiBufferRx[MODE] == BASICREFRACTED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;        
-          next_state = BASIC_REFRACTED;
-        }
-        else if ( (spiBufferRx[MODE] == ADVANCEDEXTENDED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;
-          shiftExtended = spiBufferRx[SHIFT];
-          next_state = ADVANCED_EXTENDED;
-        }
-        else if ( (spiBufferRx[MODE] == ADVANCEDREFRACTED()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR; 
-          shiftRefracted = spiBufferRx[SHIFT];        
-          next_state = ADVANCED_REFRACTED;
-        } 
-        else if ( (spiBufferRx[MODE] == INITIALSETUP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;
-          next_state = INITIAL_SETUP;
-        } 
-        else if ( (spiBufferRx[MODE] == SAFERESET()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;
-          next_state = SAFE_RESET;
-        }
-        else if ( (spiBufferRx[MODE] == DISABLESPI()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;
-          next_state = SLEEP;
-        }
-        break;
-      case BASIC_EXTENDED:
-        if ( (spiBufferRx[MODE] == STOP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
-          next_state = STOPPED;
-        }
-        else if ( /*HallSensors() == LOW*/ ReadAdc() < 10)
-          next_state = STOPPED;
-        break;
-      case BASIC_REFRACTED:
-        if ( (spiBufferRx[MODE] == STOP()) && (FLAG_BUFFER_SPI_COMPLETE == HIGH) ) {
-          FLAG_BUFFER_SPI_COMPLETE = CLEAR;                   
-          next_state = STOPPED;  
-        }
-        else if ( /*HallSensors() == LOW*/ ReadAdc() < 10)
-          next_state = STOPPED;        
-        break;
-      case ADVANCED_EXTENDED:
-        if (FLAG_MOTION_FINSISHED == HIGH)
-          next_state = STOPPED;
-        break;
-      case ADVANCED_REFRACTED:
-        if (FLAG_MOTION_FINSISHED == HIGH) 
-          next_state = STOPPED;     
-        break;    
-      default:
-        Sleep();
-        break;
-    }
-    if (next_state != current_state) {
-      printf("New State:%d; Previous State:%d; CS:%d\n", next_state, current_state, ReadAdc());
-    }
-
-    current_state = next_state;
-  }
 }
 
 void Sleep (void) {
@@ -261,29 +266,31 @@ void Sleep (void) {
 
 void SafeReset (void) {
   Extend();
-  while (/*HallSensors() == HIGH)*/ReadAdc() > 10);
+  for (int i=0; i<30; i++)
+    Delay1Ms();
+  while (ReadAdc() > THRESHOLD*2);
   Stop();
-  _delay_ms(100);//////////// experimentar valores pode nao ser necesário
   Refract();
-  while (/*HallSensors() == HIGH*/ReadAdc() > 10);
+  for (int i=0; i<30; i++)
+    Delay1Ms();
+  while (ReadAdc() > THRESHOLD*2);
   Stop();
   FLAG_SAFE_RESET_FINISHED = SET;
 }
 
 void  InitialSetup (void) {
   Extend();
-  while (/*HallSensors() == HIGH)*/ReadAdc() > 10);
-  
+  for (int i=0; i<30; i++)
+    Delay1Ms();  
+  while (ReadAdc() > THRESHOLD*2);
   Stop();
   count_pulse_s1 = 0;
   count_pulse_s2 = 0;
-  SetupExternalInterrupts(ENABLE);
-
-  _delay_ms(100);//////////// experimentar valores pode nao ser necesáro
-  
+  SetupExternalInterrupts(ENABLE);  
   Refract();
-  while (/*HallSensors() == HIGH*/ ReadAdc() > 10);
-  
+  for (int i=0; i<30; i++)
+    Delay1Ms();  
+  while (ReadAdc() > THRESHOLD*2);
   Stop();
   SetupExternalInterrupts(DISABLE);
   pulse_rate_s1 = (uint8_t)((count_pulse_s1)/stroke_lenght);
@@ -291,28 +298,34 @@ void  InitialSetup (void) {
   pulse_rate = (pulse_rate_s1 + pulse_rate_s2) / 2;
 
   FLAG_INITIAL_SETUP_FINISHED = SET;
-  //printf("%d, %d, %d\n", count_pulse_s1, count_pulse_s2, pulse_rate);
-
 }
 
 void BasicRefracted (void) {
   Refract();
+  for (int i=0; i<30; i++)
+    Delay1Ms();
 }
 
 void BasicExtended (void) {
   Extend();
+  for (int i=0; i<30; i++)
+    Delay1Ms();
 }
 
 void AdvancedExtended (uint8_t shift) {
+  printf("%d %d\n", shift, pulse_rate);
   FLAG_MOTION_FINSISHED = CLEAR;
   uint16_t maxPulses = shift*pulse_rate;
   count_pulse_s1 = 0;
   count_pulse_s2 = 0;
   SetupExternalInterrupts(ENABLE);
-  
+
   Extend();
+
+  for (int i=0; i<30; i++)
+    Delay1Ms();  
   
-  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && /*(HallSensors() == HIGH)*/(ReadAdc() > 10));
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (ReadAdc() > THRESHOLD*2));
   
   Stop();
   
@@ -320,6 +333,7 @@ void AdvancedExtended (uint8_t shift) {
 }
 
 void AdvancedRefracted (uint8_t shift) {
+  Stop();
   FLAG_MOTION_FINSISHED = CLEAR;
   uint16_t  maxPulses = shift*pulse_rate;
   count_pulse_s1 = 0;
@@ -328,9 +342,11 @@ void AdvancedRefracted (uint8_t shift) {
   SetupExternalInterrupts(ENABLE);
   
   Refract();
+
+  for (int i=0; i<30; i++)
+    Delay1Ms();  
   
-  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && /*(HallSensors() == HIGH)*/(ReadAdc() > 10));
-  
+  while (((count_pulse_s1 < maxPulses) || (count_pulse_s2 < maxPulses)) && (ReadAdc() > THRESHOLD*2));  
   Stop();
   
   FLAG_MOTION_FINSISHED = SET;
@@ -358,6 +374,7 @@ void Extend (void) {
   PORTD |=  ( 1 << SEL0 );
   _delay_us(20);
   Pwm(soft_start_stop, HIGH);
+
 }
 
 void Refract(void) {
@@ -383,15 +400,13 @@ void Pwm(uint8_t mode, uint8_t state) {
       PORTB &= ~( 1 << PWM  ); 
     }
     else if (state == HIGH)
-      SetupPwm(70);
+      SetupPwm(90);
   }
   else
     PORTB &= ~( 1 << PWM  ); 
- 
 }
 
 uint8_t HallSensors (void) {
-  _delay_us(300);
   if ( ( ( PIND & (1<<HALL_S1) ) == LOW ) && ( ( ( PIND & (1<<HALL_S2) ) == LOW ) ) )
     return LOW;
   else 

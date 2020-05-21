@@ -6,9 +6,9 @@
 void SetupExternalInterrupts(uint8_t _state) {
     //  Falling edge of INT0/1 generates an interrupt
    // EICRA |= ( (1<<ISC11) | (0<<ISC10) );
-    EICRA |= ( (1<<ISC01) | (0<<ISC00) );
+    EICRA |= ( (1<<ISC01) | (0<<ISC00) | (1<<ISC11) | (0<<ISC10));
     //  Enable/Disable interrupts request
-    EIMSK |= ( (_state<<INT0) | (_state<<INB) );
+    EIMSK |= ( (_state<<INT0) | (_state<<INT1) );
 }
 
 
@@ -29,7 +29,7 @@ void InitAdc(void){
     ADMUX   |= (1<<REFS0); // AVCC with external capacitor at AREF pin
     ADMUX   |= (ADMUX & 0xF0) | (ADC_CHANNEL & 0x0F);  //  Select ADC Channel 
     ADMUX   &= ~(1<<ADLAR); //  Right adjust result
-    ADCSRA |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0); //  Set prescaller to 128
+    ADCSRA  |= (1<<ADPS2)|(1<<ADPS1)|(1<<ADPS0); //  Set prescaller to 128
     ADCSRA  |= (1<<ADEN); //  Enable ADC
 }
 
@@ -42,10 +42,11 @@ uint16_t ReadAdc(void){
 }
 
 void SetupPwm(uint8_t _dutyCycle){
+    //  Calculate ocr1 for duty-cycle
     uint16_t occr1 = (PWM_10KHZ+1)/100*_dutyCycle-1;
     //  Non-inverting mode
     TCCR1A  |= (1<<COM1A1) | (0<<COM1A0);
-    //  Mode13: Fasr-PWM with TOP=ICR1 
+    //  Mode13: Fast-PWM with TOP=ICR1 
     TCCR1A  |= (1<<WGM11) | (0<<WGM10);
     TCCR1B  |= (1<<WGM13) | (1<<WGM12);
     //  No prescaler
@@ -73,4 +74,16 @@ void SetupSpi (void){
 void DisablePwm(void){
     TCCR1A  &= ~( (1<<COM1A0) | (1<<COM1A1) );
     TCCR1B  &= ~( (1<<CS12) | (1<<CS11) | (1<<CS10) );    
+}
+
+void Delay1Ms(void) {
+     // Set the Timer Mode to CTC
+    TCCR0A |= (1 << WGM01);
+    // Set the value that you want to count to
+    OCR0A = OCR_1MS;
+    // set prescaler to 64 and start the timer
+    TCCR0B |= (1 << CS01) | (1 << CS00);
+    while ( (TIFR0 & (1 << TOV0) ) > 0);        // wait for the overflow event
+    // reset the overflow flag
+    TIFR0 |= (1 << TOV0);
 }
