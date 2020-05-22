@@ -50,20 +50,37 @@
 #define SOFTSTARTSTOP               1
 #define DIGITAL                     0
 
+//  SPI Commands
+#define INITIALSETUP()              (uint8_t)   0x01
+#define SAFERESET()                 (uint8_t)   0x02
+#define BASICEXTENDED()             (uint8_t)   0x03
+#define BASICREFRACTED()            (uint8_t)   0X04
+#define ADVANCEDEXTENDED()          (uint8_t)   0x05
+#define ADVANCEDREFRACTED()         (uint8_t)   0x06
+#define STOP()                      (uint8_t)   0x07
+#define ENABLESPI()                 (uint8_t)   0x08
+#define DISABLESPI()                (uint8_t)   0x09
+#define UPDATE()                    (uint8_t)   0x0A
+#define SPICOMMANDINITIAL()         (uint8_t)   0xF0
+#define SPICOMMANDFINISHED()        (uint8_t)   0xF1
+#define SPIREADWITHSUCESS()         (uint8_t)   0xF2
+
 //  SPI Masks
-#define INIITIAL                    0
-#define MODE                        1
-#define SHIFT                       2
-#define PULSE_RATE_DISABLE          2
-#define STROKE_LENGHT               2
-#define PULSE_RATE_ENABLE           3
-#define ACCELARATION_RATE           4
-#define ACCELARATION_TIME           5
-#define SOFT_START_STOP             6
-#define SIZE_BUFFER_ENABLE_SPI      8
-#define SIZE_BUFFER_DISABLE_SPI     3
-#define SIZE_BUFFER_BASIC           3
-#define SIZE_BUFFER_ADVANCED        4
+#define INITIAL                     (uint8_t)   0
+#define MODE                        (uint8_t)   1
+#define SHIFT                       (uint8_t)   2
+#define PULSE_RATE_DISABLE          (uint8_t)   2
+#define STROKE_LENGHT_HIGH          (uint8_t)   2
+#define STROKE_LENGHT_LOW           (uint8_t)   3
+#define PULSE_RATE_ENABLE           (uint8_t)   4
+#define ACCELARATION_TIME_HIGH      (uint8_t)   5
+#define ACCELARATION_TIME_LOW       (uint8_t)   6
+#define SOFT_START_STOP             (uint8_t)   7
+#define SIZE_BUFFER_ENABLE_SPI      (uint8_t)   9
+#define SIZE_BUFFER_UPDATE          (uint8_t)   9
+#define SIZE_BUFFER_DISABLE_SPI     (uint8_t)   3
+#define SIZE_BUFFER_BASIC           (uint8_t)   3
+#define SIZE_BUFFER_ADVANCED        (uint8_t)   4
 
 
 //  Operating Modes 
@@ -76,19 +93,7 @@
 #define ADVANCED_EXTENDED           0x06
 #define ADVANCED_REFRACTED          0x07
 
-//  SPI Commands 
-#define INITIALSETUP()              0x01 
-#define SAFERESET()                 0x02  
-#define BASICEXTENDED()             0x03 
-#define BASICREFRACTED()            0X04
-#define ADVANCEDEXTENDED()          0x05
-#define ADVANCEDREFRACTED()         0x06  
-#define STOP()                      0x07
-#define ENABLESPI()                 0x08
-#define DISABLESPI()                0x09
-#define SPICOMMANDINITIAL()         0xF0
-#define SPICOMMANDFINISHED()        0xF1
-#define SPIREADWITHSUCESS()         0xF2
+
 
 
 
