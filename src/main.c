@@ -20,11 +20,15 @@ uint16_t current_pulses     = 0x0000;
 uint16_t next_pulses        = 0x0000;
 
 //  Status of actuator
-uint16_t position          = 0x00;
-uint16_t accelaration_rate = 0x00;
-uint16_t stroke_lenght     = 0x00;
-uint8_t  pulse_rate        = 0x00;
-uint8_t  soft_start_stop   = 0x00;
+uint16_t position               = 0x0000;
+uint8_t  position_low           = 0x00;
+uint8_t  position_high          = 0x00;
+uint8_t  pulse_rate             = 0xFF;
+uint16_t stroke_lenght          = 0x00;
+uint8_t  stroke_lenght_low      = 0x00;
+uint8_t  stroke_lenght_high     = 0x00;
+uint8_t  accelaration_rate      = 0x00;
+uint8_t  soft_start_stop        = 0x00;
 
 //  SPI buffers
 uint8_t spiCode             = 0x00;
@@ -68,9 +72,9 @@ ISR(SPI_STC_vect) {
   else if ( posSpiBuffer == CMD) {
 
     if (spiCode == GETPOSITIONLOW())
-      SPDR = position & 0xFF;
+      SPDR = (uint8_t) (position & 0xFF);
     else if(spiCode == GETPOSITIONHIGH())
-      SPDR = (position >> 8) & 0xFF;
+      SPDR = (uint8_t) ((position >> 8) & 0xFF);
     else if (spiCode == GETPULSERATE())
       SPDR = pulse_rate;
     else 
@@ -86,51 +90,36 @@ ISR(SPI_STC_vect) {
 
 
 ISR(INT0_vect) {
-  if (count_pulse_s1 == 0 && conter_direction == DECREMENTAL) {
-    position = 0;
-    count_pulse_s1 = 0;
-    count_pulse_s2 = 0;
-    count_pulse = 0;
-    SetupExternalInterrupts(LOW);
-    return;
+  if (conter_direction == INCREMENTAL) {
+    if (count_pulse_s1 < stroke_lenght*pulse_rate)
+      count_pulse_s1++;
+    else
+      count_pulse_s1 = stroke_lenght*pulse_rate;
   }
 
-  if (count_pulse_s1 == stroke_lenght*pulse_rate && conter_direction == INCREMENTAL) {
-    position = stroke_lenght;
-    count_pulse_s1 = stroke_lenght;
-    count_pulse_s2 = stroke_lenght;
-    count_pulse = stroke_lenght;
-    SetupExternalInterrupts(LOW);
-    return;
-  }
-
-  if (conter_direction == INCREMENTAL)
-    count_pulse_s1++;
-  else if (conter_direction == DECREMENTAL)
-    count_pulse_s1--;
-    
+  else if (conter_direction == DECREMENTAL) {
+    if (count_pulse_s1 > 0)
+      count_pulse_s1--;
+    else
+      count_pulse_s1 = 0;
+  }  
 }
 
 ISR(INT1_vect) {
-    if (count_pulse_s2 == 0 && conter_direction == DECREMENTAL) {
-    position = 0;
-    count_pulse_s1 = 0;
-    count_pulse_s2 = 0;
-    count_pulse = 0;    
-    return;
+if (conter_direction == INCREMENTAL) {
+    if (count_pulse_s2 < stroke_lenght*pulse_rate)
+      count_pulse_s2++;
+    else
+      count_pulse_s2 = stroke_lenght*pulse_rate;
   }
-
-  if (count_pulse_s2 == stroke_lenght*pulse_rate && conter_direction == INCREMENTAL) {
-    position = stroke_lenght;
-    count_pulse_s1 = stroke_lenght;
-    count_pulse_s2 = stroke_lenght;
-    count_pulse = stroke_lenght;    
-    return;
+  
+  else if (conter_direction == DECREMENTAL) {
+    if (count_pulse_s2 > 0)
+      count_pulse_s2--;
+    else
+      count_pulse_s2 = 0;
   }
-  if (conter_direction == INCREMENTAL)
-    count_pulse_s2++;
-  else if (conter_direction == DECREMENTAL)
-    count_pulse_s2--;
+    
 }
 
 int main () {
@@ -153,10 +142,14 @@ int main () {
   spiCode                     = 0x00;
 
   soft_start_stop             = 0x00;
-  pulse_rate                  = 0x00;
   accelaration_rate           = 0x00;
+  pulse_rate                  = 0xFF;
   stroke_lenght               = 0x00;
   position                    = 0x00;
+  position_low                = 0x00;
+  position_high               = 0x00;
+  stroke_lenght_low           = 0x00;
+  stroke_lenght_high          = 0x00;
 
   FLAG_BUFFER_SPI             = CLEAR;
   FLAG_INITIAL_SETUP          = CLEAR;
@@ -204,7 +197,7 @@ int main () {
     switch (current_state) {
       case SLEEP:
         if ((spiBuffer[MODE] == COMMUNICATION()) && (spiBuffer[CMD] == ENABLE()) && (FLAG_BUFFER_SPI== HIGH)) {
-          FLAG_BUFFER_SPI = CLEAR;;
+          FLAG_BUFFER_SPI = CLEAR;
           next_state      = STOPPED;
         }
       case INITIAL_SETUP:
@@ -257,12 +250,11 @@ int main () {
           FLAG_BUFFER_SPI = CLEAR;                   
           next_state = STOPPED;
         }
-        else if (position >= stroke_lenght) {
+        else if ((count_pulse_s1 == stroke_lenght*pulse_rate) || (count_pulse_s2 == stroke_lenght*pulse_rate)) {
           next_state      = STOPPED;
-          count_pulse_s1  = stroke_lenght*pulse_rate;
-          count_pulse_s2  = count_pulse_s1;
-          count_pulse     = count_pulse_s1;
           position        = stroke_lenght;
+          count_pulse_s1  = stroke_lenght*pulse_rate;
+          count_pulse_s2  = stroke_lenght*pulse_rate;
         }
         break;
       case BASIC_REFRACTED:
@@ -270,12 +262,11 @@ int main () {
           FLAG_BUFFER_SPI = CLEAR;                   
           next_state = STOPPED;  
         }
-        else if (position == 0) {
+        else if ((count_pulse_s1 == 0) || (count_pulse_s2 == 0)) {
           next_state      = STOPPED;
+          position        = 0;
           count_pulse_s1  = 0;
           count_pulse_s2  = 0;
-          count_pulse     = 0;
-          position        = 0;
         }       
         break;
       case ADVANCED_EXTENDED:
@@ -291,7 +282,9 @@ int main () {
         break;
       }
     if (next_state != current_state) {
-      printf("New State:%d; Previous State:%u CS:%u; Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration Rate: %u; Position:%u\n", next_state, current_state, ReadAdc(), stroke_lenght, pulse_rate, soft_start_stop, accelaration_rate, position);
+      printf("New State:%u; Previous State:%u\n", next_state, current_state);
+      printf("Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration Rate: %u; Position:%u\n", stroke_lenght, pulse_rate, soft_start_stop, accelaration_rate, position);
+
     }
     current_state = next_state;
   }
@@ -305,29 +298,42 @@ void Sleep (void) {
 void Stopped (void) {
   Stop();
   
-  count_pulse = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
-  position    = (uint16_t) (count_pulse/pulse_rate);
+  count_pulse         = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
+  position            = (uint16_t) (count_pulse / pulse_rate);
+
+
   FLAG_INITIAL_SETUP  = CLEAR;
   FLAG_SAFE_RESET     = CLEAR;
   FLAG_ADVANCED       = CLEAR;
 
   if ((FLAG_BUFFER_SPI == HIGH) && (spiBuffer[MODE] == SETUP())) {
-    if (spiBuffer[CMD] == SENDSTROKELENGHTLOW())
-      stroke_lenght |= (spiBuffer[DATA] & 0xFF);
-    else if (spiBuffer[CMD] == SENDSTROKELENGHTHIGH())
-      stroke_lenght |= ((uint16_t) (spiBuffer[DATA] << 8)) & 0xFF00;
-    else if (spiBuffer[CMD] == SENDPOSITONLOW())
-      position |= (spiBuffer[DATA] & 0xFF);
-    else if (spiBuffer[CMD] == SENDPOSITONHIGH())
-      position |= ((uint16_t) (spiBuffer[DATA] << 8)) & 0xFF00;
-    else if (spiBuffer[CMD] == SENDPULSERATE()) {
+    
+    if (spiBuffer[CMD] == SENDSTROKELENGHTLOW()) 
+      stroke_lenght_low = spiBuffer[DATA];
+
+    else if (spiBuffer[CMD] == SENDSTROKELENGHTHIGH()) 
+      stroke_lenght_high = spiBuffer[DATA];
+    
+    //else if (spiBuffer[CMD] == SENDPOSITONLOW()) 
+    //  position_low = spiBuffer[DATA];
+
+    //else if (spiBuffer[CMD] == SENDPOSITONHIGH()) 
+    //  position_high = spiBuffer[DATA];
+    
+
+    else if (spiBuffer[CMD] == SENDPULSERATE()) 
       pulse_rate = spiBuffer[DATA]; 
-      printf("%u:%u\n", pulse_rate, spiBuffer[DATA]);
-    }
+    
     else if (spiBuffer[CMD] == SENDACCELARATIONRATE())
       accelaration_rate = spiBuffer[DATA]; 
-    else if (spiBuffer[CMD] == SENDSOFTSTART())
+    
+    else if (spiBuffer[CMD] == SENDSOFTSTART()) {
       soft_start_stop = spiBuffer[DATA]; 
+    //  printf("%u\n", soft_start_stop);
+    }
+
+    FLAG_BUFFER_SPI = CLEAR;
+    stroke_lenght = (stroke_lenght_low & 0xFF) | ((stroke_lenght_high << 8) & 0xFF00);
   }
 }
 
@@ -342,10 +348,10 @@ void SafeReset (void) {
   
   Stop();
   
-  count_pulse_s1 = 0;
-  count_pulse_s2 = 0;
-  count_pulse = 0;
-  position = 0;
+  count_pulse_s1  = 0;
+  count_pulse_s2  = 0;
+  count_pulse     = 0;
+  position        = 0;
   SetupExternalInterrupts(HIGH);
   
   FLAG_SAFE_RESET = SET;
@@ -361,10 +367,10 @@ void  InitialSetup (void) {
   while (ReadAdc() > THRESHOLD*2);
   
   Stop();
-  count_pulse_s1 = 0;
-  count_pulse_s2 = 0;
-  count_pulse = 0;
-  conter_direction = INCREMENTAL;
+  count_pulse_s1    = 0;
+  count_pulse_s2    = 0;
+  count_pulse       = 0;
+  conter_direction  = INCREMENTAL;
 
   SetupExternalInterrupts(HIGH);  
   Refract();
@@ -375,15 +381,14 @@ void  InitialSetup (void) {
   
   Stop();
 
-
   SetupExternalInterrupts(LOW);  
   uint8_t pulse_rate_s1 = (uint8_t)((count_pulse_s1)/stroke_lenght);
   uint8_t pulse_rate_s2 = (uint8_t)((count_pulse_s2)/stroke_lenght);            
-  pulse_rate = (uint8_t) ((pulse_rate_s1 + pulse_rate_s2) / 2);
-  count_pulse_s1 = 0;
-  count_pulse_s2 = 0;
-  conter_direction = INCREMENTAL;
-  position = 0;
+  pulse_rate            = (uint8_t) ((pulse_rate_s1 + pulse_rate_s2) / 2);
+  count_pulse_s1        = 0;
+  count_pulse_s2        = 0;
+  count_pulse           = 0;
+  position              = 0;
 
   FLAG_INITIAL_SETUP = SET;
 }
@@ -403,7 +408,7 @@ void AdvancedExtended (void) {
   Extend();
   while (count_pulse < next_pulses) {
     count_pulse = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
-    _delay_us(10);
+    _delay_us(5);
   }
 
   Stop();
@@ -416,7 +421,7 @@ void AdvancedRefracted (void) {
 
   while (count_pulse > next_pulses) {
     count_pulse = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
-    _delay_us(10);
+    _delay_us(5);
   }
   
   Stop();
@@ -455,5 +460,17 @@ void Pwm(uint8_t _softStartStop, uint8_t _state) {
     else if (_state == HIGH)   
       PORTB |=  ( 1 << PWM  );  
   }
+
+  else if (_softStartStop == HIGH) {
+    if (_state == LOW) {
+      DisablePwm();
+      PORTB &= ~( 1 << PWM  ); 
+    }
+    else if (_state == HIGH)   
+      SetupPwm(90);
+  }
+  
+  else
+    PORTB &= ~( 1 << PWM  ); 
 }
 
