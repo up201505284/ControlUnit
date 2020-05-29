@@ -22,7 +22,7 @@ void InitPorts(void){
     //  Digital inputs
     DDRD    &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Define direction
     PORTD   |= ( (1<<HALL_S1) | (1<<HALL_S2) );   //  Enable pull-up
-    SetupExternalInterrupts(DISABLE);             //  Disable external interrupts
+    SetupExternalInterrupts(LOW);             //  Disable external interrupts
 }
 
 void InitAdc(void){
@@ -52,9 +52,10 @@ void SetupPwm(uint8_t _dutyCycle){
     //  No prescaler
     TCCR1B  |= (0<<CS12) | (0<<CS11) | (1<<CS10);
 
+    //  Set frequency
     ICR1H   = 0xFF & (PWM_10KHZ>>8);
     ICR1L   = 0xFF & PWM_10KHZ;
-
+    //  Set duty-cycle
     OCR1AH  = 0xFF & (occr1>>8);
     OCR1AL  = 0xFF & occr1;
 }
@@ -72,18 +73,8 @@ void SetupSpi (void){
 
 
 void DisablePwm(void){
+    //  Normal port operation
     TCCR1A  &= ~( (1<<COM1A0) | (1<<COM1A1) );
+    //  Counter stopped
     TCCR1B  &= ~( (1<<CS12) | (1<<CS11) | (1<<CS10) );    
-}
-
-void Delay1Ms(void) {
-     // Set the Timer Mode to CTC
-    TCCR0A |= (1 << WGM01);
-    // Set the value that you want to count to
-    OCR0A = OCR_1MS;
-    // set prescaler to 64 and start the timer
-    TCCR0B |= (1 << CS01) | (1 << CS00);
-    while ( (TIFR0 & (1 << TOV0) ) > 0);        // wait for the overflow event
-    // reset the overflow flag
-    TIFR0 |= (1 << TOV0);
 }

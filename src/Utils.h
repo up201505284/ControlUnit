@@ -9,5 +9,4 @@ void        SetupPwm                (uint8_t _dutyCycle );
 void        SetupExternalInterrupts (uint8_t _state     );
 void        SetupSpi                (void               );
 void        DisablePwm              (void               );
-void        Delay1Ms                (void               );
 #endif //  _UTILS_H_
