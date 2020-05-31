@@ -10,6 +10,7 @@ uint8_t FLAG_BUFFER_SPI      = CLEAR;
 uint8_t FLAG_INITIAL_SETUP   = CLEAR;
 uint8_t FLAG_SAFE_RESET      = CLEAR;
 uint8_t FLAG_ADVANCED        = CLEAR;
+uint8_t FLAG_PWM             = CLEAR;
 
 //  Counters for hall sensors
 uint16_t count_pulse_s1     = 0x0000;
@@ -35,7 +36,8 @@ uint8_t spiCode             = 0x00;
 uint8_t spiBuffer[256]      = {};
 uint8_t posSpiBuffer        = 0x00;
 
-uint8_t aux = 0;
+uint16_t debouncing_time    = RISETIME;
+
 //  Functions for operating modes
 void    Sleep             (void);
 void    InitialSetup      (void);    
@@ -90,36 +92,45 @@ ISR(SPI_STC_vect) {
 
 
 ISR(INT0_vect) {
-  if (conter_direction == INCREMENTAL) {
-    if (count_pulse_s1 < stroke_lenght*pulse_rate)
-      count_pulse_s1++;
-    else
-      count_pulse_s1 = stroke_lenght*pulse_rate;
-  }
+  uint8_t hall_sensor = PIND &= (1 << HALL_S1);
+  for(int i=0; i<debouncing_time; i++)
+    _delay_us(1);
 
-  else if (conter_direction == DECREMENTAL) {
-    if (count_pulse_s1 > 0)
-      count_pulse_s1--;
-    else
-      count_pulse_s1 = 0;
-  }  
+  if (hall_sensor == (PIND &= (1 << HALL_S1))) {
+    if (conter_direction == INCREMENTAL) {
+      if (count_pulse_s1 < stroke_lenght*pulse_rate)
+        count_pulse_s1++;
+      else
+        count_pulse_s1 = stroke_lenght*pulse_rate;
+    }
+    else if (conter_direction == DECREMENTAL) {
+      if (count_pulse_s1 > 0)
+        count_pulse_s1--;
+      else
+        count_pulse_s1 = 0;
+    }
+  }
 }
 
 ISR(INT1_vect) {
-if (conter_direction == INCREMENTAL) {
-    if (count_pulse_s2 < stroke_lenght*pulse_rate)
-      count_pulse_s2++;
-    else
-      count_pulse_s2 = stroke_lenght*pulse_rate;
-  }
-  
-  else if (conter_direction == DECREMENTAL) {
-    if (count_pulse_s2 > 0)
-      count_pulse_s2--;
-    else
-      count_pulse_s2 = 0;
-  }
+  uint8_t hall_sensor = PIND &= (1 << HALL_S2);
+  for(int i=0; i<debouncing_time; i++)
+    _delay_us(1);
+  if (hall_sensor == (PIND &= (1 << HALL_S1))) {
+    if (conter_direction == INCREMENTAL) {
+      if (count_pulse_s2 < stroke_lenght*pulse_rate)
+        count_pulse_s2++;
+      else
+        count_pulse_s2 = stroke_lenght*pulse_rate;
+    }
     
+    else if (conter_direction == DECREMENTAL) {
+      if (count_pulse_s2 > 0)
+        count_pulse_s2--;
+      else
+        count_pulse_s2 = 0;
+    }
+  }
 }
 
 int main () {
@@ -155,6 +166,7 @@ int main () {
   FLAG_INITIAL_SETUP          = CLEAR;
   FLAG_SAFE_RESET             = CLEAR;
   FLAG_ADVANCED               = CLEAR;
+  FLAG_PWM                    = CLEAR;
  
   uint8_t current_state       = SLEEP;
   uint8_t next_state          = SLEEP;
@@ -329,7 +341,6 @@ void Stopped (void) {
     
     else if (spiBuffer[CMD] == SENDSOFTSTART()) {
       soft_start_stop = spiBuffer[DATA]; 
-    //  printf("%u\n", soft_start_stop);
     }
 
     FLAG_BUFFER_SPI = CLEAR;
@@ -339,8 +350,6 @@ void Stopped (void) {
 
 void SafeReset (void) {
   SetupExternalInterrupts(LOW);
-  conter_direction = INCREMENTAL;
-
   Refract();
   for (int i=0; i<30; i++)
     _delay_ms(1);
@@ -367,9 +376,10 @@ void  InitialSetup (void) {
   while (ReadAdc() > THRESHOLD*2);
   
   Stop();
+
   count_pulse_s1    = 0;
   count_pulse_s2    = 0;
-  count_pulse       = 0;
+  pulse_rate        = 0xFF;
   conter_direction  = INCREMENTAL;
 
   SetupExternalInterrupts(HIGH);  
@@ -389,6 +399,7 @@ void  InitialSetup (void) {
   count_pulse_s2        = 0;
   count_pulse           = 0;
   position              = 0;
+  SetupExternalInterrupts(HIGH);  
 
   FLAG_INITIAL_SETUP = SET;
 }
@@ -455,8 +466,10 @@ void Refract(void) {
 
 void Pwm(uint8_t _softStartStop, uint8_t _state) {
   if (_softStartStop == LOW ) {
-    if (_state == LOW)
+    if (_state == LOW) {
+      DisablePwm();
       PORTB &= ~( 1 << PWM  ); 
+    }
     else if (_state == HIGH)   
       PORTB |=  ( 1 << PWM  );  
   }
@@ -465,12 +478,12 @@ void Pwm(uint8_t _softStartStop, uint8_t _state) {
     if (_state == LOW) {
       DisablePwm();
       PORTB &= ~( 1 << PWM  ); 
+      FLAG_PWM = CLEAR;
     }
-    else if (_state == HIGH)   
+    else if ((_state == HIGH) && (FLAG_PWM == LOW)) {
       SetupPwm(90);
+      FLAG_PWM = SET;
+    }
   }
   
-  else
-    PORTB &= ~( 1 << PWM  ); 
 }
-

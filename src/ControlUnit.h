@@ -35,6 +35,9 @@
 //  Reset Value for Timer 1
 #define PWM_10KHZ                   0x063F
 
+//  External Interrupts
+#define RISETIME                    800
+
 
  //  Auxiliar Masks       
 #define HIGH                        1
@@ -98,5 +101,3 @@
 #define SIZE_BUFFER_UPDATE_MODE         (uint8_t)   4
 #define SIZE_BUFFER_BASIC_MODE          (uint8_t)   4
 #define SIZE_BUFFER_ADVANCED_MODE       (uint8_t)   5
-
-

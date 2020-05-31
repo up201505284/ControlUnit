@@ -21,7 +21,7 @@ void InitPorts(void){
     
     //  Digital inputs
     DDRD    &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Define direction
-    PORTD   |= ( (1<<HALL_S1) | (1<<HALL_S2) );   //  Enable pull-up
+    PORTD   &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Disable pull-up
     SetupExternalInterrupts(LOW);             //  Disable external interrupts
 }
 
