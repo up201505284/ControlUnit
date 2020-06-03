@@ -64,6 +64,7 @@ ISR(SPI_STC_vect) {
 
   spiCode = SPDR;
 
+  
   if (spiCode == START()) {
     posSpiBuffer = 0;
     FLAG_BUFFER_SPI = CLEAR;
@@ -301,7 +302,7 @@ int main () {
         break;
       }
     if (next_state != current_state) {
-      printf("New State:%u; Previous State:%u\n", next_state, current_state);
+      printf("Speed:%u: New State:%u; Previous State:%u\n", ReadAdc(), next_state, current_state);
       printf("Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration time: %u; Position:%u, Speed:%u\n", stroke_lenght, pulse_rate, soft_start_stop, accelaration_time, position, maxSpeed);
 
     }
