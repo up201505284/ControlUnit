@@ -6,37 +6,40 @@
 #include "printf_tools.h"
 
 //  Auxiliar flags
-uint8_t FLAG_BUFFER_SPI      = CLEAR;
-uint8_t FLAG_INITIAL_SETUP   = CLEAR;
-uint8_t FLAG_SAFE_RESET      = CLEAR;
-uint8_t FLAG_ADVANCED        = CLEAR;
-uint8_t FLAG_PWM             = CLEAR;
+uint8_t FLAG_BUFFER_SPI         = CLEAR;
+uint8_t FLAG_INITIAL_SETUP      = CLEAR;
+uint8_t FLAG_SAFE_RESET         = CLEAR;
+uint8_t FLAG_ADVANCED           = CLEAR;
+uint8_t FLAG_PWM_START          = CLEAR;
+uint8_t FLAG_PWM_STOP           = CLEAR;
 
 //  Counters for hall sensors
-uint16_t count_pulse_s1     = 0x0000;
-uint16_t count_pulse_s2     = 0x0000;
-uint16_t count_pulse        = 0x0000;
-uint8_t  conter_direction   = INCREMENTAL;
-uint16_t current_pulses     = 0x0000;
-uint16_t next_pulses        = 0x0000;
+uint16_t count_pulse_s1         = 0x0000;
+uint16_t count_pulse_s2         = 0x0000;
+uint16_t count_pulse            = 0x0000;
+uint8_t  counter_direction      = INCREMENTAL;
+uint16_t current_pulses         = 0x0000;
+uint16_t next_pulses            = 0x0000;
 
 //  Status of actuator
-uint16_t position               = 0x0000;
+uint16_t position               = 0x00;
 uint8_t  position_low           = 0x00;
 uint8_t  position_high          = 0x00;
 uint8_t  pulse_rate             = 0xFF;
+uint8_t  tunning                = 0x00;
 uint16_t stroke_lenght          = 0x00;
 uint8_t  stroke_lenght_low      = 0x00;
 uint8_t  stroke_lenght_high     = 0x00;
-uint8_t  accelaration_rate      = 0x00;
+uint16_t accelaration_time      = 0x00;
+uint8_t  accelaration_time_low  = 0x00;
+uint8_t  accelaration_time_high = 0x00;
 uint8_t  soft_start_stop        = 0x00;
+uint8_t  maxSpeed               = 0x00;
 
 //  SPI buffers
-uint8_t spiCode             = 0x00;
-uint8_t spiBuffer[256]      = {};
-uint8_t posSpiBuffer        = 0x00;
-
-uint16_t debouncing_time    = RISETIME;
+uint8_t spiCode                 = 0x00;
+uint8_t spiBuffer[256]          = {};
+uint8_t posSpiBuffer            = 0x00;
 
 //  Functions for operating modes
 void    Sleep             (void);
@@ -60,6 +63,7 @@ void    Pwm               (uint8_t _softStartStop, uint8_t _state );
 ISR(SPI_STC_vect) {
 
   spiCode = SPDR;
+
   if (spiCode == START()) {
     posSpiBuffer = 0;
     FLAG_BUFFER_SPI = CLEAR;
@@ -79,6 +83,10 @@ ISR(SPI_STC_vect) {
       SPDR = (uint8_t) ((position >> 8) & 0xFF);
     else if (spiCode == GETPULSERATE())
       SPDR = pulse_rate;
+    else if (spiCode == GETFLAGADVANCED()) 
+      SPDR = FLAG_ADVANCED;
+    
+    
     else 
         SPDR = READWITHSUCESS();
   }
@@ -92,45 +100,39 @@ ISR(SPI_STC_vect) {
 
 
 ISR(INT0_vect) {
-  uint8_t hall_sensor = PIND &= (1 << HALL_S1);
-  for(int i=0; i<debouncing_time; i++)
-    _delay_us(1);
-
-  if (hall_sensor == (PIND &= (1 << HALL_S1))) {
-    if (conter_direction == INCREMENTAL) {
-      if (count_pulse_s1 < stroke_lenght*pulse_rate)
-        count_pulse_s1++;
-      else
-        count_pulse_s1 = stroke_lenght*pulse_rate;
-    }
-    else if (conter_direction == DECREMENTAL) {
-      if (count_pulse_s1 > 0)
-        count_pulse_s1--;
-      else
-        count_pulse_s1 = 0;
-    }
+  if (counter_direction == INCREMENTAL) {
+    if (count_pulse_s1 < stroke_lenght*pulse_rate)
+      count_pulse_s1++;
+    else
+      count_pulse_s1 = stroke_lenght*pulse_rate;
   }
+  else if (counter_direction == DECREMENTAL) {
+    if (count_pulse_s1 > 0)
+      count_pulse_s1--;
+    else
+      count_pulse_s1 = 0;
+  }
+  else if (counter_direction == IS) 
+    count_pulse_s1++;
 }
 
 ISR(INT1_vect) {
-  uint8_t hall_sensor = PIND &= (1 << HALL_S2);
-  for(int i=0; i<debouncing_time; i++)
-    _delay_us(1);
-  if (hall_sensor == (PIND &= (1 << HALL_S1))) {
-    if (conter_direction == INCREMENTAL) {
-      if (count_pulse_s2 < stroke_lenght*pulse_rate)
-        count_pulse_s2++;
-      else
-        count_pulse_s2 = stroke_lenght*pulse_rate;
-    }
-    
-    else if (conter_direction == DECREMENTAL) {
-      if (count_pulse_s2 > 0)
-        count_pulse_s2--;
-      else
-        count_pulse_s2 = 0;
-    }
+  if (counter_direction == INCREMENTAL) {
+    if (count_pulse_s2 < stroke_lenght*pulse_rate)
+      count_pulse_s2++;
+    else
+      count_pulse_s2 = stroke_lenght*pulse_rate;
   }
+  
+  else if (counter_direction == DECREMENTAL) {
+    if (count_pulse_s2 > 0)
+      count_pulse_s2--;
+    else
+      count_pulse_s2 = 0;
+  }
+
+  else if (counter_direction == IS) 
+    count_pulse_s2++;
 }
 
 int main () {
@@ -147,14 +149,18 @@ int main () {
   count_pulse_s1              = 0x00;
   count_pulse_s2              = 0x00;
   count_pulse                 = 0x00;
-  conter_direction            = INCREMENTAL;
+  counter_direction           = IS;
 
   posSpiBuffer                = 0x00;
   spiCode                     = 0x00;
 
   soft_start_stop             = 0x00;
-  accelaration_rate           = 0x00;
-  pulse_rate                  = 0xFF;
+  maxSpeed                    = 0x00;
+  accelaration_time           = 0x00;
+  accelaration_time_low       = 0x00;
+  accelaration_time_high      = 0x00;
+  pulse_rate                  = 0x00;
+  tunning                     = 0x00;
   stroke_lenght               = 0x00;
   position                    = 0x00;
   position_low                = 0x00;
@@ -166,14 +172,15 @@ int main () {
   FLAG_INITIAL_SETUP          = CLEAR;
   FLAG_SAFE_RESET             = CLEAR;
   FLAG_ADVANCED               = CLEAR;
-  FLAG_PWM                    = CLEAR;
+  FLAG_PWM_START              = CLEAR;
+  FLAG_PWM_STOP               = CLEAR;
  
   uint8_t current_state       = SLEEP;
   uint8_t next_state          = SLEEP;
 
   sei();
-  printf("New State:%d; Previous State:%u CS:%u; Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration Rate: %u; Position:%u\n", next_state, current_state, ReadAdc(), stroke_lenght, pulse_rate, soft_start_stop, accelaration_rate, position);
-
+      printf("Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration time: %u; Position:%u, Speed:%u\n", stroke_lenght, pulse_rate, soft_start_stop, accelaration_time, position, maxSpeed);
+  
   while(1) {
 
     switch (current_state) {
@@ -259,7 +266,7 @@ int main () {
         break;
       case BASIC_EXTENDED:
         if ( (spiBuffer[MODE] == BASIC()) && (spiBuffer[CMD] == STOP()) && (FLAG_BUFFER_SPI == HIGH) ) {
-          FLAG_BUFFER_SPI = CLEAR;                   
+          FLAG_BUFFER_SPI = CLEAR;                 
           next_state = STOPPED;
         }
         else if ((count_pulse_s1 == stroke_lenght*pulse_rate) || (count_pulse_s2 == stroke_lenght*pulse_rate)) {
@@ -295,7 +302,7 @@ int main () {
       }
     if (next_state != current_state) {
       printf("New State:%u; Previous State:%u\n", next_state, current_state);
-      printf("Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration Rate: %u; Position:%u\n", stroke_lenght, pulse_rate, soft_start_stop, accelaration_rate, position);
+      printf("Stroke:%u; Pulse rate:%u; Soft start and soft:%u; Accelaration time: %u; Position:%u, Speed:%u\n", stroke_lenght, pulse_rate, soft_start_stop, accelaration_time, position, maxSpeed);
 
     }
     current_state = next_state;
@@ -316,7 +323,6 @@ void Stopped (void) {
 
   FLAG_INITIAL_SETUP  = CLEAR;
   FLAG_SAFE_RESET     = CLEAR;
-  FLAG_ADVANCED       = CLEAR;
 
   if ((FLAG_BUFFER_SPI == HIGH) && (spiBuffer[MODE] == SETUP())) {
     
@@ -325,26 +331,27 @@ void Stopped (void) {
 
     else if (spiBuffer[CMD] == SENDSTROKELENGHTHIGH()) 
       stroke_lenght_high = spiBuffer[DATA];
-    
-    //else if (spiBuffer[CMD] == SENDPOSITONLOW()) 
-    //  position_low = spiBuffer[DATA];
-
-    //else if (spiBuffer[CMD] == SENDPOSITONHIGH()) 
-    //  position_high = spiBuffer[DATA];
-    
 
     else if (spiBuffer[CMD] == SENDPULSERATE()) 
       pulse_rate = spiBuffer[DATA]; 
     
-    else if (spiBuffer[CMD] == SENDACCELARATIONRATE())
-      accelaration_rate = spiBuffer[DATA]; 
+    else if (spiBuffer[CMD] == SENDACCELARATIONTIMELOW())
+      accelaration_time_low = spiBuffer[DATA]; 
+
+    else if (spiBuffer[CMD] == SENDACCELARATIONTIMEHIGH())
+      accelaration_time_high = spiBuffer[DATA]; 
     
     else if (spiBuffer[CMD] == SENDSOFTSTART()) {
       soft_start_stop = spiBuffer[DATA]; 
+      FLAG_PWM_STOP = SET;
     }
+    
+    else if (spiBuffer[CMD] == SENDMAXSPEED())
+      maxSpeed = spiBuffer[DATA];
 
     FLAG_BUFFER_SPI = CLEAR;
     stroke_lenght = (stroke_lenght_low & 0xFF) | ((stroke_lenght_high << 8) & 0xFF00);
+    accelaration_time  = (accelaration_time_low & 0xFF) | ((accelaration_time_high << 8) & 0xFF00);
   }
 }
 
@@ -379,22 +386,22 @@ void  InitialSetup (void) {
 
   count_pulse_s1    = 0;
   count_pulse_s2    = 0;
-  pulse_rate        = 0xFF;
-  conter_direction  = INCREMENTAL;
-
+  pulse_rate        = 0x00;
+  counter_direction  = IS;
   SetupExternalInterrupts(HIGH);  
-  Refract();
   
+  Refract();
   for (int i=0; i<30; i++)
-    _delay_ms(1);  
+    _delay_ms(1);
   while (ReadAdc() > THRESHOLD*2);
   
   Stop();
 
   SetupExternalInterrupts(LOW);  
   uint8_t pulse_rate_s1 = (uint8_t)((count_pulse_s1)/stroke_lenght);
-  uint8_t pulse_rate_s2 = (uint8_t)((count_pulse_s2)/stroke_lenght);            
+  uint8_t pulse_rate_s2 = (uint8_t)((count_pulse_s2)/stroke_lenght);     
   pulse_rate            = (uint8_t) ((pulse_rate_s1 + pulse_rate_s2) / 2);
+  printf("%u:%u:%u\n", count_pulse_s1, count_pulse_s2, pulse_rate);
   count_pulse_s1        = 0;
   count_pulse_s2        = 0;
   count_pulse           = 0;
@@ -405,19 +412,20 @@ void  InitialSetup (void) {
 }
 
 void BasicRefracted (void) {
-  conter_direction = DECREMENTAL;
+  counter_direction = DECREMENTAL;
   Refract();
 }
 
 void BasicExtended (void) {
-  conter_direction = INCREMENTAL;
+  counter_direction = INCREMENTAL;
   Extend();
 }
 
 void AdvancedExtended (void) {
-  conter_direction = INCREMENTAL;
+  FLAG_ADVANCED = CLEAR;
+  counter_direction = INCREMENTAL;
   Extend();
-  while (count_pulse < next_pulses) {
+  while ((count_pulse_s1 < next_pulses) && (count_pulse_s2 < next_pulses)) {
     count_pulse = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
     _delay_us(5);
   }
@@ -427,10 +435,11 @@ void AdvancedExtended (void) {
 }
 
 void AdvancedRefracted (void) {
-  conter_direction = DECREMENTAL;
+  FLAG_ADVANCED = CLEAR;
+  counter_direction = DECREMENTAL;
   Refract();
 
-  while (count_pulse > next_pulses) {
+  while ((count_pulse_s1 > next_pulses) && (count_pulse_s2 > next_pulses)) {
     count_pulse = (uint16_t) ((count_pulse_s1 + count_pulse_s2) / 2);
     _delay_us(5);
   }
@@ -441,6 +450,7 @@ void AdvancedRefracted (void) {
 }
 
 void Stop  (void) {
+  FLAG_PWM_START = CLEAR; 
   Pwm(soft_start_stop, LOW);
   PORTD &= ~( 1 << INA  );
   PORTD &= ~( 1 << INB  );
@@ -448,6 +458,7 @@ void Stop  (void) {
 }   
 
 void Extend (void) {
+  FLAG_PWM_STOP = CLEAR; 
   PORTD &= ~( 1 << INB  );
   PORTD |=  ( 1 << INA  );
   PORTD |=  ( 1 << SEL0 );
@@ -456,6 +467,7 @@ void Extend (void) {
 }
 
 void Refract(void) {
+  FLAG_PWM_STOP = CLEAR; 
   PORTD &= ~( 1 << INA  );
   PORTD &= ~( 1 << SEL0 );
   PORTD |=  ( 1 << INB  );
@@ -465,25 +477,61 @@ void Refract(void) {
 }
 
 void Pwm(uint8_t _softStartStop, uint8_t _state) {
-  if (_softStartStop == LOW ) {
-    if (_state == LOW) {
+  if ( (_softStartStop == LOW) || ( ( (_softStartStop == HIGH) &&  (FLAG_PWM_START == HIGH) && (_state == HIGH) ) || ( (_softStartStop == HIGH) && (FLAG_PWM_STOP == HIGH) && (_state == LOW) ) ) ) {
+    if ( (_state == LOW) ) {
       DisablePwm();
       PORTB &= ~( 1 << PWM  ); 
     }
-    else if (_state == HIGH)   
+    else if ((_state == HIGH)  && (_softStartStop == LOW) ) {   
       PORTB |=  ( 1 << PWM  );  
+    }
+    else if ( (_state == HIGH) && (_softStartStop == HIGH) ) {
+      if (maxSpeed == 100) {
+          DisablePwm();
+          PORTB |=  ( 1 << PWM  );  
+        }
+      else 
+        SetupPwm(maxSpeed);
+    }  
   }
 
-  else if (_softStartStop == HIGH) {
-    if (_state == LOW) {
+  else if ( (_softStartStop == HIGH) && ( ((FLAG_PWM_START == LOW) && (_state == HIGH)) || ((FLAG_PWM_STOP == LOW) && (_state == LOW)) )) {
+    if (_state == LOW ) {
+      uint32_t accelaration_rate = accelaration_time/100;
+      uint8_t duty_cyle = 99;
+      for (duty_cyle = maxSpeed-1; duty_cyle > 0; duty_cyle--) {
+        SetupPwm(duty_cyle);
+        for (int i = 0; i < accelaration_rate; i++)
+          _delay_ms(1);
+      }
       DisablePwm();
       PORTB &= ~( 1 << PWM  ); 
-      FLAG_PWM = CLEAR;
+      FLAG_PWM_STOP = SET;
     }
-    else if ((_state == HIGH) && (FLAG_PWM == LOW)) {
-      SetupPwm(90);
-      FLAG_PWM = SET;
+    else if ((_state == HIGH)) {
+      uint32_t accelaration_rate = accelaration_time/100;
+      uint8_t duty_cyle = 1;
+
+      for (duty_cyle = 1; duty_cyle < maxSpeed; duty_cyle++) {
+        SetupPwm(duty_cyle);
+        for (int i = 0; i < accelaration_rate; i++)
+          _delay_ms(1);
+      }
+      if (maxSpeed == 100) {
+        DisablePwm();
+        PORTB |=  ( 1 << PWM  );  
+      }
+
+      else 
+        SetupPwm(maxSpeed);
+
+      FLAG_PWM_START = SET;
     }
+  }
+
+  else {
+    DisablePwm();
+    PORTB |=  ( 1 << PWM  );  
   }
   
 }

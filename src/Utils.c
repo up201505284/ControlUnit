@@ -21,7 +21,7 @@ void InitPorts(void){
     
     //  Digital inputs
     DDRD    &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Define direction
-    PORTD   &= ~( (1<<HALL_S1) | (1<<HALL_S2) );  //  Disable pull-up
+    PORTD   |= ( (1<<HALL_S1) | (1<<HALL_S2) );  //  Enable pull-up
     SetupExternalInterrupts(LOW);             //  Disable external interrupts
 }
 
@@ -78,3 +78,20 @@ void DisablePwm(void){
     //  Counter stopped
     TCCR1B  &= ~( (1<<CS12) | (1<<CS11) | (1<<CS10) );    
 }
+/*
+float Round(float _number) {
+    float _value = (int)(_number * 100 + 0.5); 
+    return _value;
+}
+
+uint8_t CalculateTunning (float _pulseRate) {
+    float decimalPart = Round(_pulseRate);
+
+    for (int i=1; i<255; i++) {
+        float _tunning = ((1-decimalPart)*i);
+        if (Round(_tunning - (uint8_t) (_tunning)) == 0)
+            return i;
+    }
+
+}
+*/

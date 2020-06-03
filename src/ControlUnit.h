@@ -46,6 +46,7 @@
 #define CLEAR                       0
 #define INCREMENTAL                 1
 #define DECREMENTAL                 0
+#define IS                          2
 
 //  Operating Modes 
 #define SLEEP                       0x00
@@ -71,13 +72,17 @@
 #define GETPOSITIONLOW()                (uint8_t)   0x0A
 #define GETPOSITIONHIGH()               (uint8_t)   0x0B
 #define GETPULSERATE()                  (uint8_t)   0x0C
+#define GETFLAGADVANCED()               (uint8_t)   0x14
 #define SENDPOSITONLOW()                (uint8_t)   0x0D
 #define SENDPOSITONHIGH()               (uint8_t)   0x0E
 #define SENDPULSERATE()                 (uint8_t)   0x0F
 #define SENDSTROKELENGHTLOW()           (uint8_t)   0x10
 #define SENDSTROKELENGHTHIGH()          (uint8_t)   0x11
 #define SENDSOFTSTART()                 (uint8_t)   0x12
-#define SENDACCELARATIONRATE()          (uint8_t)   0x13
+#define SENDACCELARATIONTIMELOW()       (uint8_t)   0x13
+#define SENDACCELARATIONTIMEHIGH()      (uint8_t)   0x15
+#define SENDMAXSPEED()                  (uint8_t)   0x16
+
 
 //  Auc Commands
 #define START()                         (uint8_t)   0xFF
